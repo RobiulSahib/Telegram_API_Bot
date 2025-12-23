@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Telegram Bot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+
+    header p {
+      color: #8892b0;
+      font-size: 1rem;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title .icon {
+      font-size: 1.5rem;
+    }
+
+    /* Agent List */
+    .agent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .agent-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 0.3s ease;
+    }
+
+    .agent-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateX(5px);
+    }
+
+    .agent-item.active {
+      border-color: #00ff88;
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+    }
+
+    .agent-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .agent-name {
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+
+    .agent-id {
+      color: #8892b0;
+      font-size: 0.85rem;
+      font-family: monospace;
+    }
+
+    .status-badge {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-active {
+      background: linear-gradient(90deg, #00ff88, #00d9ff);
+      color: #1a1a2e;
+    }
+
+    .status-inactive {
+      background: rgba(255, 255, 255, 0.1);
+      color: #8892b0;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 0.9rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      color: #1a1a2e;
+    }
+
+    .btn-primary:hover {
+      transform: scale(1.05);
+      box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4);
+    }
+
+    .btn-danger {
+      background: rgba(255, 77, 77, 0.2);
+      color: #ff4d4d;
+      border: 1px solid rgba(255, 77, 77, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(255, 77, 77, 0.4);
+    }
+
+    .agent-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    /* Add Agent Form */
+    .add-form {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .add-form input {
+      flex: 1;
+      min-width: 150px;
+      padding: 12px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-size: 0.95rem;
+    }
+
+    .add-form input::placeholder {
+      color: #8892b0;
+    }
+
+    .add-form input:focus {
+      outline: none;
+      border-color: #00d9ff;
+    }
+
+    /* Logs */
+    .logs-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .log-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .log-item:last-child {
+      border-bottom: none;
+    }
+
+    .log-time {
+      color: #00d9ff;
+      font-family: monospace;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .log-direction {
+      font-size: 1.2rem;
+    }
+
+    .log-content {
+      flex: 1;
+    }
+
+    .log-meta {
+      font-size: 0.8rem;
+      color: #8892b0;
+      margin-bottom: 4px;
+    }
+
+    .log-message {
+      color: #ccd6f6;
+      font-size: 0.9rem;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #8892b0;
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #8892b0;
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 16px 24px;
+      background: #00ff88;
+      color: #1a1a2e;
+      border-radius: 10px;
+      font-weight: 600;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.error {
+      background: #ff4d4d;
+      color: #fff;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>🤖 Admin Panel</h1>
+      <p>Manage agents and control message routing</p>
+    </header>
+
+    <!-- Agents Card -->
+    <div class="card">
+      <h2 class="card-title"><span class="icon">👥</span> Agents</h2>
+      <div id="agentList" class="agent-list">
+        <div class="loading">Loading agents...</div>
+      </div>
+    </div>
+
+    <!-- Add Agent Card -->
+    <div class="card">
+      <h2 class="card-title"><span class="icon">➕</span> Add New Agent</h2>
+      <form class="add-form" id="addAgentForm">
+        <input type="number" id="newAgentId" placeholder="Telegram ID (e.g., 123456789)" required>
+        <input type="text" id="newAgentName" placeholder="Agent Name" required>
+        <button type="submit" class="btn btn-primary">Add Agent</button>
+      </form>
+    </div>
+
+    <!-- Logs Card -->
+    <div class="card">
+      <h2 class="card-title"><span class="icon">📝</span> Recent Conversations</h2>
+      <div id="logsList" class="logs-list">
+        <div class="loading">Loading logs...</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const API_BASE = '';
+
+    // Show toast notification
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast show' + (isError ? ' error' : '');
+      setTimeout(() => toast.className = 'toast', 3000);
+    }
+
+    // Load and display agents
+    async function loadAgents() {
+      try {
+        const res = await fetch(`${API_BASE}/api/agents`);
+        const data = await res.json();
+
+        const container = document.getElementById('agentList');
+
+        if (data.agents.length === 0) {
+          container.innerHTML = '<div class="empty-state">No agents registered yet</div>';
+          return;
+        }
+
+        container.innerHTML = data.agents.map(agent => `
+          <div class="agent-item ${agent.is_active ? 'active' : ''}">
+            <div class="agent-info">
+              <span class="agent-name">${agent.name}</span>
+              <span class="agent-id">ID: ${agent.id} | Telegram: ${agent.telegram_id}</span>
+            </div>
+            <div class="agent-actions">
+              <span class="status-badge ${agent.is_active ? 'status-active' : 'status-inactive'}">
+                ${agent.is_active ? '● Active' : '○ Inactive'}
+              </span>
+              ${!agent.is_active ? `
+                <button class="btn btn-primary" onclick="activateAgent(${agent.id})">
+                  Make Active
+                </button>
+              ` : ''}
+              <button class="btn btn-danger" onclick="removeAgent(${agent.id})">✕</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        document.getElementById('agentList').innerHTML =
+          '<div class="empty-state">Error loading agents</div>';
+      }
+    }
+
+    // Activate agent
+    async function activateAgent(agentId) {
+      try {
+        const res = await fetch(`${API_BASE}/api/agents/${agentId}/activate`, {
+          method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast(data.message);
+          loadAgents();
+        } else {
+          showToast(data.message, true);
+        }
+      } catch (err) {
+        showToast('Error activating agent', true);
+      }
+    }
+
+    // Remove agent
+    async function removeAgent(agentId) {
+      if (!confirm('Remove this agent?')) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/agents/${agentId}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('Agent removed');
+          loadAgents();
+        } else {
+          showToast(data.message, true);
+        }
+      } catch (err) {
+        showToast('Error removing agent', true);
+      }
+    }
+
+    // Add new agent
+    document.getElementById('addAgentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const telegramId = document.getElementById('newAgentId').value;
+      const name = document.getElementById('newAgentName').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/agents`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId, name })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('Agent added successfully');
+          document.getElementById('addAgentForm').reset();
+          loadAgents();
+        } else {
+          showToast(data.message, true);
+        }
+      } catch (err) {
+        showToast('Error adding agent', true);
+      }
+    });
+
+    // Load logs
+    async function loadLogs() {
+      try {
+        const res = await fetch(`${API_BASE}/api/logs`);
+        const logs = await res.json();
+
+        const container = document.getElementById('logsList');
+
+        if (logs.length === 0) {
+          container.innerHTML = '<div class="empty-state">No conversations yet</div>';
+          return;
+        }
+
+        container.innerHTML = logs.map(log => {
+          const userName = log.user_name || `User ${log.user_id}`;
+          const agentName = log.agent_name || `Agent ${log.agent_id}`;
+          return `
+          <div class="log-item">
+            <span class="log-time">${log.timestamp.slice(11, 16)}</span>
+            <span class="log-direction">${log.direction === 'user_to_agent' ? '→' : '←'}</span>
+            <div class="log-content">
+              <div class="log-meta">
+                ${userName} ${log.direction === 'user_to_agent' ? '→' : '←'} ${agentName}
+              </div>
+              <div class="log-message">${log.message.slice(0, 100)}${log.message.length > 100 ? '...' : ''}</div>
+            </div>
+          </div>
+        `}).join('');
+      } catch (err) {
+        document.getElementById('logsList').innerHTML =
+          '<div class="empty-state">Error loading logs</div>';
+      }
+    }
+
+    // Initial load
+    loadAgents();
+    loadLogs();
+
+    // Auto-refresh every 5 seconds
+    setInterval(() => {
+      loadAgents();
+      loadLogs();
+    }, 5000);
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,16 @@
+{
+    "name": "admin-telebot",
+    "version": "1.0.0",
+    "description": "Telegram bot with manual agent routing",
+    "main": "bot.js",
+    "scripts": {
+        "start": "node bot.js",
+        "dev": "node bot.js"
+    },
+    "dependencies": {
+        "telegraf": "^4.15.0",
+        "sql.js": "^1.10.0",
+        "express": "^4.18.2",
+        "cors": "^2.8.5"
+    }
+}
