@@ -1,5 +1,6 @@
 /**
  * Telegram Bot with Manual Agent Routing
+ * Version: 1.1.0 (Admin Panel Update)
  * Built with Telegraf.js for Node.js/MERN developers
  */
 const { Telegraf } = require("telegraf");
