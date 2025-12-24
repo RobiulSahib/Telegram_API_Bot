@@ -45,6 +45,29 @@
       font-size: 1rem;
     }
 
+    .header-actions {
+      margin-top: 20px;
+    }
+
+    .btn-logout {
+      padding: 10px 24px;
+      border: 1px solid rgba(255, 77, 77, 0.4);
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-family: 'Inter', sans-serif;
+      background: rgba(255, 77, 77, 0.15);
+      color: #ff6b6b;
+      transition: all 0.3s ease;
+    }
+
+    .btn-logout:hover {
+      background: rgba(255, 77, 77, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(255, 77, 77, 0.2);
+    }
+
     .card {
       background: rgba(255, 255, 255, 0.05);
       backdrop-filter: blur(10px);
@@ -285,6 +308,9 @@
     <header>
       <h1>🤖 Admin Panel</h1>
       <p>Manage agents and control message routing</p>
+      <div class="header-actions">
+        <button class="btn-logout" onclick="logout()">🚪 Logout</button>
+      </div>
     </header>
 
     <!-- Agents Card -->
@@ -317,6 +343,17 @@
   <div id="toast" class="toast"></div>
 
   <script>
+    // Check authentication - redirect to login if not authenticated
+    if (sessionStorage.getItem('admin_auth_v1') !== 'true') {
+      window.location.href = '/';
+    }
+
+    // Logout function
+    function logout() {
+      sessionStorage.removeItem('admin_auth_v1');
+      window.location.href = '/';
+    }
+
     const API_BASE = '';
 
     // Show toast notification

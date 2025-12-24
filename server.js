@@ -7,11 +7,50 @@ const path = require("path");
 const db = require("./database");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3010;
+
+// Admin credentials (in production, use environment variables and hashed passwords)
+const ADMIN_EMAIL = "adminapibot@gmail.com";
+const ADMIN_PASSWORD = "gohelp123";
 
 app.use(cors());
 app.use(express.json());
+
+// Prevent caching for all routes to ensure login logic always runs
+app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    next();
+});
+
+// Serve login page as default
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+// Serve dashboard (protected by client-side session check)
+app.get("/dashboard", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "dashboard.html"));
+});
+
+// Static files
 app.use(express.static(path.join(__dirname, "public")));
+
+// ============ AUTH ROUTES ============
+
+// Login endpoint
+app.post("/api/login", (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ success: false, message: "Email and password required" });
+    }
+
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+        return res.json({ success: true, message: "Login successful" });
+    }
+
+    return res.status(401).json({ success: false, message: "Invalid email or password" });
+});
 
 // ============ API ROUTES ============
 
@@ -82,8 +121,13 @@ app.delete("/api/admins/:telegramId", (req, res) => {
 // Start server
 function startServer() {
     app.listen(PORT, () => {
-        console.log(`🌐 Admin Panel running at http://localhost:${PORT}`);
+        console.log(`🌐 Admin Panel running on port ${PORT}`);
     });
+}
+
+// Allow running server independently causing no conflict with bot instance
+if (require.main === module) {
+    db.initDb().then(startServer);
 }
 
 module.exports = { startServer };
