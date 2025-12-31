@@ -308,6 +308,11 @@
     <header>
       <h1>🤖 Admin Panel</h1>
       <p>Manage agents and control message routing</p>
+      <div id="connectionStatus" style="font-size: 0.8rem; margin-top: 10px; color: #8892b0;">
+        <span id="syncDot"
+          style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#8892b0; margin-right:5px;"></span>
+        <span id="lastUpdated">Initializing...</span>
+      </div>
       <div class="header-actions">
         <button class="btn-logout" onclick="logout()">🚪 Logout</button>
       </div>
@@ -527,14 +532,49 @@
     }
 
     // Initial load
-    loadAgents();
-    loadLogs();
+    async function init() {
+      await Promise.all([loadAgents(), loadLogs()]);
+      updateSyncStatus('Live');
+      startPolling();
+    }
 
-    // Auto-refresh every 5 seconds
-    setInterval(() => {
-      loadAgents();
-      loadLogs();
-    }, 5000);
+    function updateSyncStatus(status, isError = false) {
+      const dot = document.getElementById('syncDot');
+      const text = document.getElementById('lastUpdated');
+      const now = new Date().toLocaleTimeString();
+
+      if (status === 'Syncing') {
+        dot.style.background = '#00d9ff';
+        dot.style.boxShadow = '0 0 10px #00d9ff';
+      } else if (isError) {
+        dot.style.background = '#ff4d4d';
+        dot.style.boxShadow = '0 0 10px #ff4d4d';
+        text.textContent = `Offline (Last sync: ${now})`;
+      } else {
+        dot.style.background = '#00ff88';
+        dot.style.boxShadow = '0 0 10px #00ff88';
+        text.textContent = `Connected (Last sync: ${now})`;
+      }
+    }
+
+    let isPolling = false;
+    async function startPolling() {
+      if (isPolling) return;
+      isPolling = true;
+
+      while (true) {
+        await new Promise(r => setTimeout(r, 5000));
+        updateSyncStatus('Syncing');
+        try {
+          await Promise.all([loadAgents(), loadLogs()]);
+          updateSyncStatus('Live');
+        } catch (err) {
+          updateSyncStatus('Error', true);
+        }
+      }
+    }
+
+    init();
   </script>
 </body>
 
