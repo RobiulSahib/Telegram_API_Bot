@@ -372,8 +372,11 @@
 
     // Load and display agents
     async function loadAgents() {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       try {
-        const res = await fetch(`${API_BASE}/api/agents`);
+        const res = await fetch(`${API_BASE}/api/agents`, { signal: controller.signal });
+        clearTimeout(timeoutId);
         const data = await res.json();
 
         const container = document.getElementById('agentList');
@@ -500,8 +503,11 @@
 
     // Load logs
     async function loadLogs() {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       try {
-        const res = await fetch(`${API_BASE}/api/logs`);
+        const res = await fetch(`${API_BASE}/api/logs`, { signal: controller.signal });
+        clearTimeout(timeoutId);
         const logs = await res.json();
 
         const container = document.getElementById('logsList');
