@@ -1,0 +1,6 @@
+node_modules/
+.env
+.venv/
+*.db
+temp/
+package-lock.json

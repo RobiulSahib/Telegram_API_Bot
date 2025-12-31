@@ -8,9 +8,13 @@
         "dev": "node bot.js"
     },
     "dependencies": {
-        "telegraf": "^4.15.0",
-        "sql.js": "^1.10.0",
+        "axios": "^1.13.2",
+        "cors": "^2.8.5",
         "express": "^4.18.2",
-        "cors": "^2.8.5"
+        "form-data": "^4.0.5",
+        "fs-extra": "^11.3.3",
+        "openai": "^6.15.0",
+        "sql.js": "^1.10.0",
+        "telegraf": "^4.15.0"
     }
 }

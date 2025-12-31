@@ -391,7 +391,11 @@
                 <button class="btn btn-primary" onclick="activateAgent(${agent.id})">
                   Make Active
                 </button>
-              ` : ''}
+              ` : `
+                <button class="btn btn-danger" style="background: rgba(255, 140, 0, 0.2); color: #ff8c00; border-color: rgba(255, 140, 0, 0.3);" onclick="deactivateAgent(${agent.id})">
+                  Make Offline
+                </button>
+              `}
               <button class="btn btn-danger" onclick="removeAgent(${agent.id})">✕</button>
             </div>
           </div>
@@ -418,6 +422,25 @@
         }
       } catch (err) {
         showToast('Error activating agent', true);
+      }
+    }
+
+    // Deactivate agent
+    async function deactivateAgent(agentId) {
+      try {
+        const res = await fetch(`${API_BASE}/api/agents/${agentId}/deactivate`, {
+          method: 'POST'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast(data.message);
+          loadAgents();
+        } else {
+          showToast(data.message, true);
+        }
+      } catch (err) {
+        showToast('Error deactivating agent', true);
       }
     }
 

@@ -7,6 +7,19 @@ const { Telegraf } = require("telegraf");
 const config = require("./config");
 const db = require("./database");
 const { startServer } = require("./server");
+const axios = require("axios");
+const fs = require("fs-extra");
+const path = require("path");
+const { OpenAI } = require("openai");
+
+// Initialize OpenAI for transcription
+const openai = new OpenAI({
+    apiKey: config.OPENAI_API_KEY,
+});
+
+// Helper for temporary files
+const TEMP_DIR = path.join(__dirname, "temp");
+fs.ensureDirSync(TEMP_DIR);
 
 // ============ SETUP INITIAL DATA ============
 
@@ -28,6 +41,55 @@ function setupInitialData() {
     }
 }
 
+// ============ VOICE HELPERS ============
+
+/**
+ * Transcribes a voice message using OpenAI Whisper
+ */
+async function transcribeVoice(bot, fileId) {
+    if (config.OPENAI_API_KEY === "YOUR_OPENAI_API_KEY") {
+        console.warn("⚠️ OpenAI API key not configured. Voice transcription skipped.");
+        return "[Voice message - please configure OpenAI API key to transcribe]";
+    }
+
+    const tempFilePath = path.join(TEMP_DIR, `${fileId}.ogg`);
+
+    try {
+        // Get file link
+        const fileLink = await bot.telegram.getFileLink(fileId);
+
+        // Download file
+        const response = await axios({
+            method: "get",
+            url: fileLink.href,
+            responseType: "stream",
+        });
+
+        const writer = fs.createWriteStream(tempFilePath);
+        response.data.pipe(writer);
+
+        await new Promise((resolve, reject) => {
+            writer.on("finish", resolve);
+            writer.on("error", reject);
+        });
+
+        // Transcribe
+        const transcription = await openai.audio.transcriptions.create({
+            file: fs.createReadStream(tempFilePath),
+            model: "whisper-1",
+        });
+
+        // Clean up
+        await fs.remove(tempFilePath);
+
+        return transcription.text;
+    } catch (error) {
+        console.error("❌ Transcription error:", error);
+        if (fs.existsSync(tempFilePath)) await fs.remove(tempFilePath);
+        return "[Error transcribing voice message]";
+    }
+}
+
 // ============ MAIN ============
 
 async function main() {
@@ -39,6 +101,22 @@ async function main() {
     setupInitialData();
 
     const bot = new Telegraf(config.BOT_TOKEN);
+
+    // Verify bot token
+    console.log("🔌 Connecting to Telegram...");
+    try {
+        const botInfo = await bot.telegram.getMe();
+        console.log(`✅ SUCCESS: Connected as @${botInfo.username} (${botInfo.id})`);
+    } catch (err) {
+        console.error("❌ ERROR: Could not connect to Telegram.");
+        console.error(`Check your BOT_TOKEN in config.js. Error: ${err.message}`);
+        // Don't exit here, let launch() try again or log more info
+    }
+
+    // Global error handler
+    bot.catch((err, ctx) => {
+        console.error(`❌ Bot error for ${ctx.updateType}:`, err);
+    });
 
     // ============ ADMIN COMMANDS ============
 
@@ -298,8 +376,7 @@ async function main() {
     bot.on("text", async (ctx) => {
         const senderId = ctx.from.id;
         const messageText = ctx.message.text;
-
-        // Skip commands
+        console.log(`📩 Received text message from ${senderId}: ${messageText.slice(0, 20)}...`);
         if (messageText.startsWith("/")) return;
 
         // Admin messages - just inform
@@ -311,19 +388,41 @@ async function main() {
 
         // Agent message - route reply to user
         if (db.isAgent(senderId)) {
-            const session = db.getAgentSession(senderId);
+            // Check if agent is replying to a specific message
+            let targetUserId = null;
+            let targetUserName = "User";
 
-            if (!session) {
-                return ctx.reply("❌ No user to reply to. Wait for a user message first.");
+            if (ctx.message.reply_to_message) {
+                const mapping = db.getMessageMapping(ctx.message.reply_to_message.message_id);
+                if (mapping) {
+                    targetUserId = mapping.userId;
+                    targetUserName = mapping.userName;
+                }
+            }
+
+            // Fallback to last session if no reply target found
+            if (!targetUserId) {
+                const session = db.getAgentSession(senderId);
+                if (session) {
+                    targetUserId = session.userId;
+                    targetUserName = session.userName;
+                }
+            }
+
+            if (!targetUserId) {
+                return ctx.reply("❌ No user to reply to. Reply to a specific message or wait for a new user message.");
             }
 
             const agent = db.getAgentByTelegramId(senderId);
 
+            if (!agent || !agent.is_active) {
+                return ctx.reply("❌ You are currently OFFLINE. Please ask the admin to make you active in the dashboard before replying.");
+            }
+
             try {
-                await bot.telegram.sendMessage(session.userId, messageText);
-                // Use the stored user name from the session
-                db.logMessage(session.userId, session.userName || "User", agent.id, agent.name, "agent_to_user", messageText);
-                await ctx.reply(`✅ Reply sent to user ${session.userId}`);
+                await bot.telegram.sendMessage(targetUserId, messageText);
+                db.logMessage(targetUserId, targetUserName, agent.id, agent.name, "agent_to_user", messageText);
+                await ctx.reply(`✅ Reply sent to ${targetUserName} (ID: ${targetUserId})`);
             } catch (e) {
                 await ctx.reply(`❌ Failed to send: ${e.message}`);
             }
@@ -332,6 +431,7 @@ async function main() {
 
         // Regular user - route to active agent
         const activeAgent = db.getActiveAgent();
+        console.log(`🔍 Active agent: ${activeAgent ? activeAgent.name : "NONE"}`);
 
         if (!activeAgent) {
             return ctx.reply(
@@ -349,18 +449,120 @@ async function main() {
                 `👤 User: ${userName} ${userUsername} (ID: \`${senderId}\`)\n` +
                 `💬 Message:\n${messageText}`;
 
-            await bot.telegram.sendMessage(activeAgent.telegram_id, forwardText, {
+            console.log(`📤 Forwarding message to agent ${activeAgent.name} (${activeAgent.telegram_id})...`);
+            const sentMsg = await bot.telegram.sendMessage(activeAgent.telegram_id, forwardText, {
                 parse_mode: "Markdown",
             });
+            console.log("✅ Message forwarded successfully.");
 
-            // Store user name in session so we can use it when agent replies
+            // Store message mapping so agent can reply specifically to this user
+            db.addMessageMapping(sentMsg.message_id, senderId, userDisplayName);
+
+            // Still keep session for backward compatibility (optional)
             db.setAgentSession(activeAgent.telegram_id, senderId, userDisplayName);
+
             db.logMessage(senderId, userDisplayName, activeAgent.id, activeAgent.name, "user_to_agent", messageText);
 
             await ctx.reply("✅ Your message has been received. An agent will respond shortly.");
         } catch (e) {
-            await ctx.reply("Sorry, there was an error sending your message. Please try again.");
-            console.error("Error forwarding message:", e);
+            let errorMsg = "Sorry, there was an error sending your message. Please try again.";
+            if (e.message.includes("chat not found") || e.message.includes("bot was blocked")) {
+                errorMsg = "❌ Technical Error: The agent hasn't started the bot or has blocked it. Agents must send /start to the bot first!";
+            }
+            await ctx.reply(errorMsg);
+            console.error("❌ Forwarding Error:", e.message);
+        }
+    });
+
+    // Handle Voice Messages
+    bot.on("voice", async (ctx) => {
+        const senderId = ctx.from.id;
+
+        // --- AGENT VOICE REPLY ---
+        if (db.isAgent(senderId)) {
+            let targetUserId = null;
+            let targetUserName = "User";
+
+            // Identify recipient from reply mapping
+            if (ctx.message.reply_to_message) {
+                const mapping = db.getMessageMapping(ctx.message.reply_to_message.message_id);
+                if (mapping) {
+                    targetUserId = mapping.userId;
+                    targetUserName = mapping.userName;
+                }
+            }
+
+            // Fallback to most recent session
+            if (!targetUserId) {
+                const session = db.getAgentSession(senderId);
+                if (session) {
+                    targetUserId = session.userId;
+                    targetUserName = session.userName;
+                }
+            }
+
+            if (!targetUserId) {
+                return ctx.reply("❌ No user to reply to. Long-press a user's message and select 'Reply' to send them a voice note.");
+            }
+
+            const agent = db.getAgentByTelegramId(senderId);
+
+            if (!agent || !agent.is_active) {
+                return ctx.reply("❌ You are currently OFFLINE. Please ask the admin to make you active in the dashboard before replying.");
+            }
+
+            try {
+                console.log(`📤 Routing agent voice reply to user ${targetUserId}...`);
+                await bot.telegram.sendVoice(targetUserId, ctx.message.voice.file_id);
+                db.logMessage(targetUserId, targetUserName, agent.id, agent.name, "agent_to_user", "[Voice Message]");
+                await ctx.reply(`✅ Voice reply sent to ${targetUserName}`);
+            } catch (e) {
+                await ctx.reply(`❌ Failed to send voice reply: ${e.message}`);
+                console.error("Agent voice routing error:", e);
+            }
+            return;
+        }
+        // --- USER VOICE MESSAGE ---
+        if (db.isAdmin(senderId)) {
+            return ctx.reply("Admin voice messages are not routed. Use /start for instructions.");
+        }
+
+        const activeAgent = db.getActiveAgent();
+        if (!activeAgent) {
+            return ctx.reply("Sorry, no support agents are available right now.");
+        }
+
+        const userName = ctx.from.first_name || "Unknown";
+        const userUsername = ctx.from.username ? `@${ctx.from.username}` : "";
+        const userDisplayName = userUsername ? `${userName} (${userUsername})` : userName;
+
+        await ctx.reply("🎤 Processing your voice message...");
+
+        const transcription = await transcribeVoice(bot, ctx.message.voice.file_id);
+
+        try {
+            const forwardHeader =
+                `📩 *New VOICE message from user:*\n\n` +
+                `👤 User: ${userName} ${userUsername} (ID: \`${senderId}\`)\n` +
+                `📝 Transcription:\n_${transcription}_`;
+
+            // 1. Forward the actual voice file (FREE - agent can listen to it)
+            console.log(`📤 Forwarding voice file to agent ${activeAgent.name}...`);
+            const sentVoice = await bot.telegram.sendVoice(activeAgent.telegram_id, ctx.message.voice.file_id, {
+                caption: forwardHeader,
+                parse_mode: "Markdown",
+            });
+
+            // Store mapping
+            db.addMessageMapping(sentVoice.message_id, senderId, userDisplayName);
+            db.setAgentSession(activeAgent.telegram_id, senderId, userDisplayName);
+
+            db.logMessage(senderId, userDisplayName, activeAgent.id, activeAgent.name, "user_to_agent", `[Voice] ${transcription}`);
+
+            await ctx.reply("✅ Your voice message has been sent to an agent. They can listen to it and respond shortly.");
+        } catch (e) {
+            await ctx.reply("Sorry, there was an error sending your voice message. If you are an agent, make sure you have started the bot!");
+            console.error("Error forwarding voice:", e);
         }
     });
 
@@ -377,7 +579,19 @@ async function main() {
     console.log("\nPress Ctrl+C to stop");
     console.log("=".repeat(50) + "\n");
 
-    bot.launch();
+    console.log("🔄 Clearing any existing webhooks...");
+    await bot.telegram.deleteWebhook().catch(() => { });
+
+    bot.launch()
+        .then(() => {
+            console.log("🚀 Bot is live and polling for updates!");
+        })
+        .catch(err => {
+            console.error("❌ Bot failed to launch:", err);
+            if (err.message.includes("409: Conflict")) {
+                console.error("💡 Hint: This usually means another instance of the bot is running or a webhook is set.");
+            }
+        });
 
     // Enable graceful stop
     process.once("SIGINT", () => bot.stop("SIGINT"));

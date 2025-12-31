@@ -9,4 +9,8 @@ module.exports = {
 
     // No hardcoded agents - add agents from the dashboard
     INITIAL_AGENTS: [],
+
+    // OpenAI API Key for Voice-to-Text (Whisper)
+    // Get one from https://platform.openai.com/
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY || "YOUR_OPENAI_API_KEY",
 };

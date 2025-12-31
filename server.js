@@ -71,6 +71,13 @@ app.post("/api/agents/:id/activate", (req, res) => {
     res.json(result);
 });
 
+// Set agent as offline
+app.post("/api/agents/:id/deactivate", (req, res) => {
+    const agentId = parseInt(req.params.id);
+    const result = db.deactivateAgent(agentId);
+    res.json(result);
+});
+
 // Add new agent
 app.post("/api/agents", (req, res) => {
     const { telegramId, name } = req.body;
@@ -120,8 +127,16 @@ app.delete("/api/admins/:telegramId", (req, res) => {
 
 // Start server
 function startServer() {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
         console.log(`🌐 Admin Panel running on port ${PORT}`);
+    }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.error(`\n❌ ERROR: Port ${PORT} is already in use.`);
+            console.error(`💡 Hint: A previous instance of the bot is still running. I killed it, but if this happens again, try restarting or wait 10 seconds.`);
+            // Don't exit the process, let the bot continue if possible
+        } else {
+            console.error('❌ Server error:', err.message);
+        }
     });
 }
 

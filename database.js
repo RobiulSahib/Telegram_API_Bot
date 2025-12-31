@@ -58,6 +58,14 @@ async function initDb() {
     )
   `);
 
+    db.run(`
+    CREATE TABLE IF NOT EXISTS message_mappings (
+      agent_message_id INTEGER PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      user_name TEXT
+    )
+  `);
+
     saveDb();
     console.log("Database initialized");
 }
@@ -148,6 +156,21 @@ function setActiveAgent(agentId) {
     return { success: true, message: `Agent '${agentName}' is now active` };
 }
 
+function deactivateAgent(agentId) {
+    const result = db.exec("SELECT name FROM agents WHERE id = ?", [agentId]);
+
+    if (result.length === 0 || result[0].values.length === 0) {
+        return { success: false, message: "Agent not found" };
+    }
+
+    const agentName = result[0].values[0][0];
+
+    db.run("UPDATE agents SET is_active = 0 WHERE id = ?", [agentId]);
+    saveDb();
+
+    return { success: true, message: `Agent '${agentName}' is now offline` };
+}
+
 function getActiveAgent() {
     const result = db.exec("SELECT id, telegram_id, name FROM agents WHERE is_active = 1");
     if (result.length === 0 || result[0].values.length === 0) return null;
@@ -202,6 +225,26 @@ function getAgentSession(agentTelegramId) {
     return { userId: result[0].values[0][0], userName: result[0].values[0][1] };
 }
 
+// ============ MESSAGE MAPPING (MULTI-USER) ============
+
+function addMessageMapping(agentMessageId, userId, userName) {
+    db.run("INSERT OR REPLACE INTO message_mappings (agent_message_id, user_id, user_name) VALUES (?, ?, ?)", [
+        agentMessageId,
+        userId,
+        userName,
+    ]);
+    saveDb();
+}
+
+function getMessageMapping(agentMessageId) {
+    const result = db.exec(
+        "SELECT user_id, user_name FROM message_mappings WHERE agent_message_id = ?",
+        [agentMessageId]
+    );
+    if (result.length === 0 || result[0].values.length === 0) return null;
+    return { userId: result[0].values[0][0], userName: result[0].values[0][1] };
+}
+
 // ============ CONVERSATION LOGGING ============
 
 function logMessage(userId, userName, agentId, agentName, direction, message) {
@@ -245,12 +288,15 @@ module.exports = {
     addAgent,
     removeAgent,
     setActiveAgent,
+    deactivateAgent,
     getActiveAgent,
     getAllAgents,
     isAgent,
     getAgentByTelegramId,
     setAgentSession,
     getAgentSession,
+    addMessageMapping,
+    getMessageMapping,
     logMessage,
     getLogs,
 };
