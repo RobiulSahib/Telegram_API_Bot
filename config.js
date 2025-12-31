@@ -2,7 +2,7 @@
 
 module.exports = {
     // Bot token from @BotFather (@GBhelpcenterbot)
-    BOT_TOKEN: "8154534518:AAGSsDbUBjNM-CPikwJt5eSesN1WuOOTS28",
+    BOT_TOKEN: process.env.BOT_TOKEN || "8154534518:AAGSsDbUBjNM-CPikwJt5eSesN1WuOOTS28",
 
     // No hardcoded admin - add admins from the dashboard
     ADMIN_ID: null,

@@ -10,8 +10,8 @@ const app = express();
 const PORT = process.env.PORT || 3010;
 
 // Admin credentials (in production, use environment variables and hashed passwords)
-const ADMIN_EMAIL = "adminapibot@gmail.com";
-const ADMIN_PASSWORD = "gohelp123";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "adminapibot@gmail.com";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "gohelp123";
 
 app.use(cors());
 app.use(express.json());
